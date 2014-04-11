@@ -168,7 +168,7 @@ namespace ChineseCheckers
                 }
             }
         }
-        public static void SelectPiece(int currentX, int currentY)
+        public static bool SelectPiece(int currentX, int currentY)
         {
             for (int x = 0; x < Cols; x++)
             {
@@ -230,7 +230,7 @@ namespace ChineseCheckers
                                                                 (CurrentlySelected[1] < validMoves[1]) ? validMoves[1] - 1 : (CurrentlySelected[1] > validMoves[1]) ? validMoves[1] + 1 : validMoves[1]},
                                                                 new int[] { x, y });
                                                         mouseState = MouseState.Picking;
-                                                        break;
+                                                        return true;
                                                     }
                                                 }
                                             }
@@ -243,6 +243,7 @@ namespace ChineseCheckers
                     }
                 }
             }
+            return false;
         }
         private static void TranslatePiece(int[] source, int[] translation, int[] destination)
         {

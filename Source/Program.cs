@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Threading;
 using OpenTK;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Input;
@@ -30,16 +31,12 @@ namespace ChineseCheckers
         private double[] modelViewMatrix = new double[16];
         private int[] viewport = new int[4];
 
-        public Renderable()
+        protected override void OnLoad(EventArgs eventargs)
         {
             currentX = 0;
             currentY = 0;
-        }
-        protected override void OnLoad(EventArgs eventargs)
-        {
-           
             base.OnLoad(eventargs);
-            base.Title = "Chinese Checkers";
+            base.Title = "Peg Solitair";
             base.VSync = VSyncMode.On;
             this.Mouse.ButtonDown += new EventHandler<MouseButtonEventArgs>(OnMouseDownHandler);
             GL.ClearColor(0f, 0f, 0f, 0f);
@@ -70,8 +67,7 @@ namespace ChineseCheckers
             GL.Viewport(ClientRectangle.X, ClientRectangle.Y, ClientRectangle.Width, ClientRectangle.Height);
             Matrix4 projection = Matrix4.CreatePerspectiveFieldOfView((float)Math.PI / 4, Width / (float)Height, 1.0f, 64.0f);
             GL.MatrixMode(MatrixMode.Projection);
-            GL.LoadMatrix(ref projection);
-            
+            GL.LoadMatrix(ref projection);  
         }
         protected void OnMouseDownHandler(object sender, OpenTK.Input.MouseButtonEventArgs e)
         {
@@ -100,6 +96,84 @@ namespace ChineseCheckers
             currentX = (int)results.X;
             currentY = (int)results.Y;
         } 
+    }
+    class Logic
+    {
+        public enum Mode
+        {
+            Debug,
+            SinglePlayer,
+            ArtificalIntelligence
+        };
+        public enum Difficulty
+        {
+            Dumb,
+            Somewhat,
+            Very
+        };
+
+        public int currentTurn { get; private set; }    //0 = NPC, 1 = Player
+        public TimeSpan startTime { get; private set; }
+        public TimeSpan endTime { get; private set; }
+        public Mode GameMode { get; set; }
+        public Difficulty GameDifficulty { get; set; }
+
+        private Thread intelligenceThread;
+
+        public void InitializeLogic(Mode gameMode, Difficulty difficulty, int playerStart)
+        {
+            GameMode = gameMode;
+            GameDifficulty = difficulty;
+            currentTurn = playerStart;
+            startTime = new TimeSpan();
+            endTime = new TimeSpan();
+        }
+
+        public void HandleMouseInput(int x, int y)
+        {
+            if (currentTurn == 0)
+                return;
+            currentTurn = PegSolitaire.SelectPiece(x, y) ? 0 : 1;
+        }
+        public void HandleNPCMove()
+        {
+            switch (GameDifficulty)
+            {
+                case Difficulty.Dumb:
+                    {
+                        startTime = DateTime.Now.TimeOfDay;
+                        Dumb();
+                        endTime = DateTime.Now.TimeOfDay;
+                        break;
+                    }
+                case Difficulty.Somewhat:
+                    {
+                        startTime = DateTime.Now.TimeOfDay;
+                        Somewhat();
+                        endTime = DateTime.Now.TimeOfDay;
+                        break;
+                    }
+                case Difficulty.Very:
+                    {
+                        startTime = DateTime.Now.TimeOfDay;
+                        Very();
+                        endTime = DateTime.Now.TimeOfDay;
+                        break;
+                    }
+            }
+        }
+        public void Dumb()
+        {
+
+        }
+        public void Somewhat()
+        {
+
+        }
+        public void Very()
+        {
+
+        }
     }
 }
     
