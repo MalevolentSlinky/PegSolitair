@@ -10,7 +10,7 @@ using OpenTK.Input;
 
 //TO-DO: Implement the AI (MiniMax / AB-Pruning), Add Player Transitions, Add Win States
 
-namespace ChineseCheckers
+namespace PegSolitair
 {
     class Program
     {
@@ -25,11 +25,27 @@ namespace ChineseCheckers
     }
     class Renderable : GameWindow
     {
+        private LogicBase logicBase;
+        private SolitairBase solitairBase;
         private int currentX;
         private int currentY;
         private double[] projectionMatrix = new double[16];
         private double[] modelViewMatrix = new double[16];
         private int[] viewport = new int[4];
+        private Thread logicThread;
+
+        private int currentTurn;
+
+        public int CurrentTurn { get { return currentTurn; }
+            set
+            {
+                if (currentTurn != value && value == 0)
+                {
+                    logicBase.HandleAIMove(solitairBase.Board);
+                }
+                currentTurn = value;
+            }
+        } // 0 = AI, 1 = Player
 
         protected override void OnLoad(EventArgs eventargs)
         {
@@ -39,9 +55,13 @@ namespace ChineseCheckers
             base.Title = "Peg Solitair";
             base.VSync = VSyncMode.On;
             this.Mouse.ButtonDown += new EventHandler<MouseButtonEventArgs>(OnMouseDownHandler);
+            logicBase = new LogicBase();
+            logicBase.InitializeLogic(LogicBase.Mode.ArtificalIntelligence, LogicBase.Difficulty.Dumb, 1);
             GL.ClearColor(0f, 0f, 0f, 0f);
             GL.Enable(EnableCap.ColorMaterial);
-            PegSolitaire.InitializeGameBoard();
+            currentTurn = 1;
+            solitairBase = new SolitairBase();
+            solitairBase.InitializeGameBoard();
         }
         protected override void OnRenderFrame(FrameEventArgs e)
         {
@@ -57,8 +77,7 @@ namespace ChineseCheckers
             GL.LoadIdentity();
             GL.GetDouble(GetPName.ModelviewMatrix, modelViewMatrix);
             GL.GetInteger(GetPName.Viewport, viewport);
-            PegSolitaire.DrawBoard();
-            
+            solitairBase.DrawBoard();
             SwapBuffers();
         }
         protected override void OnResize(EventArgs e)
@@ -76,10 +95,10 @@ namespace ChineseCheckers
         }
         private void UpdateMouse(int x, int y)
         {
-            if (currentX != x && currentY != y)
+            if (currentX != x && currentY != y && CurrentTurn == 1)
             {
                 WindowToClient(x, ref currentX, y, ref currentY);
-                PegSolitaire.SelectPiece(currentX, currentY);
+                CurrentTurn = solitairBase.SelectPiece(currentX, currentY) ? 0 : 1;
             }
         }
         private void WindowToClient(int x, ref int currentX, int y, ref int currentY)
@@ -95,84 +114,6 @@ namespace ChineseCheckers
             OpenTK.Graphics.Glu.UnProject(new Vector3(x, viewport[3] - y, 0.0f), modelViewMatrix, projectionMatrix, viewport, out results);
             currentX = (int)results.X;
             currentY = (int)results.Y;
-        } 
-    }
-    class Logic
-    {
-        public enum Mode
-        {
-            Debug,
-            SinglePlayer,
-            ArtificalIntelligence
-        };
-        public enum Difficulty
-        {
-            Dumb,
-            Somewhat,
-            Very
-        };
-
-        public int currentTurn { get; private set; }    //0 = NPC, 1 = Player
-        public TimeSpan startTime { get; private set; }
-        public TimeSpan endTime { get; private set; }
-        public Mode GameMode { get; set; }
-        public Difficulty GameDifficulty { get; set; }
-
-        private Thread intelligenceThread;
-
-        public void InitializeLogic(Mode gameMode, Difficulty difficulty, int playerStart)
-        {
-            GameMode = gameMode;
-            GameDifficulty = difficulty;
-            currentTurn = playerStart;
-            startTime = new TimeSpan();
-            endTime = new TimeSpan();
-        }
-
-        public void HandleMouseInput(int x, int y)
-        {
-            if (currentTurn == 0)
-                return;
-            currentTurn = PegSolitaire.SelectPiece(x, y) ? 0 : 1;
-        }
-        public void HandleNPCMove()
-        {
-            switch (GameDifficulty)
-            {
-                case Difficulty.Dumb:
-                    {
-                        startTime = DateTime.Now.TimeOfDay;
-                        Dumb();
-                        endTime = DateTime.Now.TimeOfDay;
-                        break;
-                    }
-                case Difficulty.Somewhat:
-                    {
-                        startTime = DateTime.Now.TimeOfDay;
-                        Somewhat();
-                        endTime = DateTime.Now.TimeOfDay;
-                        break;
-                    }
-                case Difficulty.Very:
-                    {
-                        startTime = DateTime.Now.TimeOfDay;
-                        Very();
-                        endTime = DateTime.Now.TimeOfDay;
-                        break;
-                    }
-            }
-        }
-        public void Dumb()
-        {
-
-        }
-        public void Somewhat()
-        {
-
-        }
-        public void Very()
-        {
-
         }
     }
 }
