@@ -67,7 +67,7 @@ namespace PegSolitair
             switch (GameDifficulty)
             {
                 case Difficulty.Dumb:
-                    SearchThread = new Thread(() => Dumb(Depth, true, rootNode, ref bestMove));
+                    SearchThread = new Thread(() => Dumb(Depth, true, Int32.MaxValue, Int32.MinValue, rootNode, ref bestMove));
                     break;
                 case Difficulty.Somewhat:
                     SearchThread = new Thread(new ThreadStart(Somewhat));
@@ -82,39 +82,40 @@ namespace PegSolitair
             TimeSpan end = DateTime.Now.TimeOfDay;
             Console.WriteLine("{0} {1}",first.ToString(), end.ToString());
         }
-        public int Dumb(int depth, bool isMax, int[] node, ref int[] bestMove)
+        public int Dumb(int depth, bool isMax, int min, int max, int[] node, ref int[] bestMove)
         {
-            int[] bestNode = new int[81];
-            int bestScore = isMax ? Int32.MinValue : Int32.MaxValue;
-            int currentScore;
             if (depth == 0)
             {
                 return Evaluation();
             }
+            int[] bestNode = new int[81];
             foreach (int[] possibleMoves in GetChildren(node, depth))
             {
-                int[] currentMove;
-                currentScore = Dumb(depth - 1, !isMax, TranslateNode(possibleMoves, node), ref bestMove);
+                int currentScore = Dumb(depth - 1, !isMax, min, max, TranslateNode(possibleMoves, node), ref bestMove);
+                if (depth == 4)
+                {
+                    int k = 5;
+                }
                 if (isMax) //MaxPlayer
                 {
-                    if (currentScore > bestScore)
+                    if (currentScore > max)
                     {
-                        bestScore = currentScore;
+                        max = currentScore;
                         bestNode = possibleMoves;
                         bestMove = possibleMoves;
                     }
                 }
                 if (!isMax) //MinPlayer
                 {
-                    if (currentScore < bestScore)
+                    if (currentScore < min)
                     {
-                        bestScore = currentScore;
+                        min = currentScore;
                         bestNode = possibleMoves;
                         bestMove = possibleMoves;
                     }
                 }
             }
-            return bestScore;
+            return isMax ? max : min;
         }
         public void Somewhat()
         {
@@ -168,8 +169,11 @@ namespace PegSolitair
         }
         private int Evaluation()
         {
-            int evalScore = 0;
-            return 0;
+            for (int i = 0; i < 81; i++)
+            {
+
+            }
+            return new Random().Next(0, 1000);
         }
     }
 }
