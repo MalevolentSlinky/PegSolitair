@@ -57,9 +57,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Source\Board.cs" />
-    <Compile Include="Source\Layout.cs" />
+    <Compile Include="Source\HelperBase.cs" />
+    <Compile Include="Source\LogicBase.cs" />
     <Compile Include="Source\Program.cs" />
+    <Compile Include="Source\SolitairBase.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
