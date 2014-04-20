@@ -44,7 +44,7 @@ namespace PegSolitair
         public void InitializeLogic(Mode gameMode, Difficulty difficulty, int playerStart)
         {
             SearchTree = new Stack<int[][]>();
-            Depth = 10;
+            Depth = 2;
             totalMoves = 0;
             GameMode = gameMode;
             GameDifficulty = difficulty;
@@ -84,22 +84,23 @@ namespace PegSolitair
             Console.WriteLine("totalMoves = " + totalMoves);
             TimeSpan end = DateTime.Now.TimeOfDay;
             Console.WriteLine("{0} {1}",first.ToString(), end.ToString());
+            Console.WriteLine("Best Move = " + bestMove[0] + " to " +bestMove[2]);
         }
         public int Dumb(int depth, bool isMax, int min, int max, int[] node, ref int[] bestMove)
         {
             totalMoves++;
-            //Console.WriteLine("Depth: " + depth);
+            Console.WriteLine("\nDepth: " + depth);
             String s1 = isMax ? "max, currently: " + max : "min, currently " + min;
-            //Console.WriteLine("current Player = " + s1);
+            Console.WriteLine("current Player = " + s1);
             if (depth == 0)//if at leaf node (root = maxDepth)
             {
-                int j = Evaluation();
-                //Console.WriteLine("Node score: "+j);
-                //PrintNode(node);
+                int j = DumbEvaluation(node);
+                Console.WriteLine("Node score: "+j);
+                PrintNode(node);
                 return j;
             }
 
-           // PrintNode(node);
+            PrintNode(node);
             int[] bestNode = new int[81];
             foreach (int[] possibleMoves in GetChildren(node, depth)) 
             {//calculates and receives one move at a time for every possible move in 'node'
@@ -123,7 +124,7 @@ namespace PegSolitair
                     }
                     if (max >= min) //THIS 'IF' PROVIDES PRUNING FUNCTIONALITY FOR MAX NODES
                     {//if alpha > beta
-                        //Console.WriteLine("Pruning the rest of this branch and backtracking...");
+                        Console.WriteLine(max+ ">="+ min +"Pruning the rest of this branch and backtracking...");
                         return max; //return alpha (cut off rest of search for this branch)
                     }
                 }
@@ -138,6 +139,7 @@ namespace PegSolitair
                     }
                     if (min <= max) //THIS 'IF' PROVIDES PRUNING FUNCTIONALITY FOR MIN NODES
                     {//if beta < alpha
+                        Console.WriteLine(min + "<=" +max+", Pruning the rest of this branch and backtracking...");
                         return min; //return beta (cut off rest of search for this branch)
                     }
                 }
@@ -204,10 +206,10 @@ namespace PegSolitair
 
         private void PrintNode(int[] nodeToPrint)
         {
-            //Console.Write("+012345678");
+            Console.Write("+012345678");
             for (int y = 0; y < 9; y++)
             {
-                //Console.Write("\n" + y);
+                Console.Write("\n" + y);
                 for (int x = 0; x < 9; x++)
                 {
                     int index = x * 9 + y;
@@ -218,16 +220,103 @@ namespace PegSolitair
                 }
 
             }
-            //Console.Write("\n\n");
+            Console.Write("\n");
         }
 
-        private int Evaluation()
+        private int Evaluation(int[] node)
         {
             for (int i = 0; i < 81; i++)
             {
 
             }
             return new Random().Next(0, 1000);
+        }
+        private int DumbEvaluation(int[] node)
+        {// high value = more weighted 
+            //Dumb version only looks for win/loss states
+            int moveCount = 0;
+            foreach (int[] validMove in GetChildren(node,0)) //0 parameter is arbitrary
+            {
+                moveCount++;
+            }
+            if (moveCount == 0)
+                return 1000;
+            else
+                return 1;
+        }
+        private int SomewhatEvaluation(int[] node)
+        {// high value = more weighted 
+            //Somewhat intelligent version looks for win/loss states, 
+            //if none are found it looks for 
+            int moveCount = 0;
+            foreach (int[] validMove in GetChildren(node, 0)) //0 parameter is arbitrary
+            {
+                moveCount++;
+            }
+            if (moveCount == 0)
+                return 1000; //endstate
+            if(moveCount == 1) 
+            {
+                if (checkForSweep(node))//does this node lead to an unavoidable string of one moves til endgame?
+                    return 1000;
+            }
+            return 1;
+        }
+
+
+        private int SmartEvaluation(int[] node)
+        {
+            // high value = more weighted 
+            //smart evaluation looks for win/loss states, 
+            //if none are found it looks for sweeps
+            //if none are found it weighs the node by number of moves
+            //  -since we aimed to develop a very very efficient AI, 
+            //      we will be hoping that is our edge over the competition
+            //      , so we will give nodes with more complexity(more moves) a higher precedence,
+            //      as we will preserve our edge due to search speed
+            //I'm considering adding a function that looks for endgame 'packages' 
+            //  and purging strategies in a similar manner as sweeps...
+            //  'packages' are described on page 6 of this pdf:
+            //  http://www.link.cs.cmu.edu/15859-s11/notes/peg-solitaire.pdf 
+            //A huge problem for many complex evaluation functions is that it will have 
+            //  negative impacts on our performance, and since our main focus from the 
+            //  beginning has been speed, we need to strike a balance here...
+            int moveCount = 0;
+            foreach (int[] validMove in GetChildren(node, 0)) //0 parameter is arbitrary
+            {
+                moveCount++;
+            }
+            if (moveCount == 0)
+                return 1000; //endstate
+            if (moveCount == 1)
+            {
+                if (checkForSweep(node))//does this node lead to an unavoidable string of one moves til endgame?
+                    return 1000;
+            }
+            return 1;
+        }
+
+        private Boolean checkForSweep(int[] node)
+        {//this method will go beyond depth bounds to search for a possible endgame sweep 
+            int moveCount = 0;
+            int[] move = { 0, 0, 0 };
+            foreach (int[] validMove in GetChildren(node, 0)) //0 parameter is arbitrary
+            {
+                move = validMove;
+                moveCount++;
+                if (moveCount > 1)
+                    return false;//the sweep devolves into a more complex branching pattern
+            }
+            if (moveCount == 0)
+            {//this examined sweep continues until endgame
+                return true;
+            }
+            if (moveCount == 1)
+            {
+                TranslateNode(move, node);
+                checkForSweep(node);
+            }
+            return false;//program should never reach here 
         }
     }
 }

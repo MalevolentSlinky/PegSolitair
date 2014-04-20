@@ -52,7 +52,7 @@ namespace PegSolitair
             currentX = 0;
             currentY = 0;
             base.OnLoad(eventargs);
-            base.Title = "Peg Solitair";
+            base.Title = "Peg Solitaire";
             base.VSync = VSyncMode.On;
             this.Mouse.ButtonDown += new EventHandler<MouseButtonEventArgs>(OnMouseDownHandler);
             logicBase = new LogicBase();
