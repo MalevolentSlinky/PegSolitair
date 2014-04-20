@@ -35,7 +35,8 @@ namespace PegSolitair
         private int[] Twos = { 12, 14, 22, 28, 34, 38, 42, 46, 52, 58, 66, 68 };
         private int[] Threes = { 21, 23, 29, 33, 47, 51, 57, 59 };
         private int[] Fours = { 30, 31, 32, 39, 40, 41, 48, 49, 50 };
-        
+
+        private int totalMoves;
         //private Stack<GameBucket<int, int, SolitairBase.Piece>[][]> SearchTree { get; set; }
 
         private Thread SearchThread;
@@ -43,7 +44,8 @@ namespace PegSolitair
         public void InitializeLogic(Mode gameMode, Difficulty difficulty, int playerStart)
         {
             SearchTree = new Stack<int[][]>();
-            Depth = 4;
+            Depth = 10;
+            totalMoves = 0;
             GameMode = gameMode;
             GameDifficulty = difficulty;
             startTime = new TimeSpan();
@@ -79,42 +81,68 @@ namespace PegSolitair
             TimeSpan first = DateTime.Now.TimeOfDay;
             SearchThread.Start();
             SearchThread.Join();
+            Console.WriteLine("totalMoves = " + totalMoves);
             TimeSpan end = DateTime.Now.TimeOfDay;
             Console.WriteLine("{0} {1}",first.ToString(), end.ToString());
         }
         public int Dumb(int depth, bool isMax, int min, int max, int[] node, ref int[] bestMove)
         {
-            if (depth == 0)
+            totalMoves++;
+            //Console.WriteLine("Depth: " + depth);
+            String s1 = isMax ? "max, currently: " + max : "min, currently " + min;
+            //Console.WriteLine("current Player = " + s1);
+            if (depth == 0)//if at leaf node (root = maxDepth)
             {
-                return Evaluation();
+                int j = Evaluation();
+                //Console.WriteLine("Node score: "+j);
+                //PrintNode(node);
+                return j;
             }
+
+           // PrintNode(node);
             int[] bestNode = new int[81];
-            foreach (int[] possibleMoves in GetChildren(node, depth))
-            {
+            foreach (int[] possibleMoves in GetChildren(node, depth)) 
+            {//calculates and receives one move at a time for every possible move in 'node'
                 int currentScore = Dumb(depth - 1, !isMax, min, max, TranslateNode(possibleMoves, node), ref bestMove);
+                //recursive call of Dumb() will travel from current node to each child node until all moves are evaluated
+                //this is where all backtracking occurs
+
                 if (depth == 4)
                 {
                     int k = 5;
                 }
+
                 if (isMax) //MaxPlayer
                 {
                     if (currentScore > max)
-                    {
-                        max = currentScore;
+                    {//we have found a better max
+                        max = currentScore;  //setting aplha value
+                        //Console.WriteLine("depth = " + depth +" new max = "+ max);
                         bestNode = possibleMoves;
                         bestMove = possibleMoves;
+                    }
+                    if (max >= min) //THIS 'IF' PROVIDES PRUNING FUNCTIONALITY FOR MAX NODES
+                    {//if alpha > beta
+                        //Console.WriteLine("Pruning the rest of this branch and backtracking...");
+                        return max; //return alpha (cut off rest of search for this branch)
                     }
                 }
                 if (!isMax) //MinPlayer
                 {
                     if (currentScore < min)
-                    {
-                        min = currentScore;
+                    {//we have found a lower min
+                        //Console.WriteLine("Pruning the rest of this branch and backtracking...");
+                        min = currentScore;//setting beta value
                         bestNode = possibleMoves;
                         bestMove = possibleMoves;
                     }
+                    if (min <= max) //THIS 'IF' PROVIDES PRUNING FUNCTIONALITY FOR MIN NODES
+                    {//if beta < alpha
+                        return min; //return beta (cut off rest of search for this branch)
+                    }
                 }
             }
+            //has exausted all moves for a node
             return isMax ? max : min;
         }
         public void Somewhat()
@@ -127,20 +155,26 @@ namespace PegSolitair
         }
         private IEnumerable<int[]> GetChildren(int[] node, int depth)
         {
+            //computes and returns a single possible move
+            //into an enumarable array of ints(a node).
+            //each yield return adds one move to 
+
+            //this is where the logic for only picking 16 pieces to update WOULD come in
             for (int y = 0; y < 9; y++)
             {
                 for (int x = 0; x < 9; x++)
                 {
                     int index = y * 9 + x;
+                    //(if (node[index] == 1) should go here?)//
                     int adjacentNorth = (y - 1) * 9 + x, moveNorth = (y - 2) * 9 + x;
                     int adjacentEast = y * 9 + (x + 1), moveEast = y * 9 + (x + 2);
                     int adjacentSouth = (y + 1) * 9 + x, moveSouth = (y + 2) * 9 + x;
                     int adjacentWest = y * 9 + (x - 1), moveWest = y * 9 + (x - 2);
-                    if (node[index] == 1)
-                    {
+                    if (node[index] == 1)//shouldn't this if statement go before all of the move and adjacency calculations?
+                    {//if there is a piece at the current coordinate
                         if ((y - 2 > 0) && (node[adjacentNorth] == 1) && (node[moveNorth] == 0))
                         {
-                            yield return new int[] { index, adjacentNorth, moveNorth };
+                            yield return new int[] { index, adjacentNorth, moveNorth }; 
                         }
                         if ((x + 2 < 9) && (node[adjacentEast] == 1) && (node[moveEast] == 0))
                         {
@@ -167,6 +201,26 @@ namespace PegSolitair
             newNode[possibleMove[2]] = 1;
             return newNode;
         }
+
+        private void PrintNode(int[] nodeToPrint)
+        {
+            //Console.Write("+012345678");
+            for (int y = 0; y < 9; y++)
+            {
+                //Console.Write("\n" + y);
+                for (int x = 0; x < 9; x++)
+                {
+                    int index = x * 9 + y;
+                    if(nodeToPrint[index] == -1)
+                         Console.Write("-");
+                    else
+                        Console.Write(nodeToPrint[index]);
+                }
+
+            }
+            //Console.Write("\n\n");
+        }
+
         private int Evaluation()
         {
             for (int i = 0; i < 81; i++)
