@@ -36,6 +36,7 @@ namespace PegSolitair
         private int[] Threes = { 21, 23, 29, 33, 47, 51, 57, 59 };
         private int[] Fours = { 30, 31, 32, 39, 40, 41, 48, 49, 50 };
 
+        private int searchTimer;//used in adaptive depth bounding
         private int totalMoves;
         //private Stack<GameBucket<int, int, SolitairBase.Piece>[][]> SearchTree { get; set; }
 
@@ -44,7 +45,8 @@ namespace PegSolitair
         public void InitializeLogic(Mode gameMode, Difficulty difficulty, int playerStart)
         {
             SearchTree = new Stack<int[][]>();
-            Depth = 2;
+            Depth = 10; // first move depth = 11 because we know we can evaluate it ~30seconds
+            searchTimer = 0;
             totalMoves = 0;
             GameMode = gameMode;
             GameDifficulty = difficulty;
@@ -75,32 +77,61 @@ namespace PegSolitair
                     SearchThread = new Thread(new ThreadStart(Somewhat));
                     break;
                 case Difficulty.Very:
-                    SearchThread = new Thread(new ThreadStart(Very));
+                    SearchThread = new Thread(() => Very(Depth, true, Int32.MaxValue, Int32.MinValue, rootNode, ref bestMove));
                     break;
             }
             TimeSpan first = DateTime.Now.TimeOfDay;
             SearchThread.Start();
             SearchThread.Join();
+            Console.WriteLine("Initial MaxDepth: " + Depth);
             Console.WriteLine("totalMoves = " + totalMoves);
             TimeSpan end = DateTime.Now.TimeOfDay;
-            Console.WriteLine("{0} {1}",first.ToString(), end.ToString());
+            searchTimer = end.Subtract(first).Seconds;
+
+            //some adaptiveBounds features follow:
+            while (searchTimer <= 5)
+            {
+                Console.WriteLine("Search ended too quickly: deepening search to maxDepth: "+ (Depth+1));
+                switch (GameDifficulty)
+                {
+                    case Difficulty.Dumb:
+                        SearchThread = new Thread(() => Dumb(Depth++, true, Int32.MaxValue, Int32.MinValue, rootNode, ref bestMove));
+                        break;
+                    case Difficulty.Somewhat:
+                        SearchThread = new Thread(new ThreadStart(Somewhat));
+                        break;
+                    case Difficulty.Very:
+                        SearchThread = new Thread(() => Very(Depth++, true, Int32.MaxValue, Int32.MinValue, rootNode, ref bestMove));
+                        break;
+                }
+                SearchThread.Start();
+                SearchThread.Join();
+                Console.WriteLine("totalMoves = " + totalMoves);
+                end = DateTime.Now.TimeOfDay;
+                Console.WriteLine("Time taken so far: " + end.Subtract(first).Seconds);
+                searchTimer += end.Subtract(first).Seconds;//last move timer = total search time so far
+            }
+            //END adaptive bounds feature
+            //ACTUAL MOVE SHOULD BE EXECUTED HERE ZACH
+            Console.WriteLine("Total time taken: " + searchTimer);
             Console.WriteLine("Best Move = " + bestMove[0] + " to " +bestMove[2]);
+            totalMoves = 0;
         }
         public int Dumb(int depth, bool isMax, int min, int max, int[] node, ref int[] bestMove)
         {
             totalMoves++;
-            Console.WriteLine("\nDepth: " + depth);
+            //Console.WriteLine("\nDepth: " + depth);
             String s1 = isMax ? "max, currently: " + max : "min, currently " + min;
-            Console.WriteLine("current Player = " + s1);
+           // Console.WriteLine("current Player = " + s1);
             if (depth == 0)//if at leaf node (root = maxDepth)
             {
-                int j = DumbEvaluation(node);
-                Console.WriteLine("Node score: "+j);
-                PrintNode(node);
+                int j = Evaluation(node);
+                //Console.WriteLine("Node score: "+j);
+                //PrintNode(node);
                 return j;
             }
 
-            PrintNode(node);
+            //PrintNode(node);
             int[] bestNode = new int[81];
             foreach (int[] possibleMoves in GetChildren(node, depth)) 
             {//calculates and receives one move at a time for every possible move in 'node'
@@ -124,7 +155,71 @@ namespace PegSolitair
                     }
                     if (max >= min) //THIS 'IF' PROVIDES PRUNING FUNCTIONALITY FOR MAX NODES
                     {//if alpha > beta
-                        Console.WriteLine(max+ ">="+ min +"Pruning the rest of this branch and backtracking...");
+                        //Console.WriteLine(max+ ">="+ min +"Pruning the rest of this branch...");
+                        return max; //return alpha (cut off rest of search for this branch)
+                    }
+                }
+                if (!isMax) //MinPlayer
+                {
+                    if (currentScore < min)
+                    {//we have found a lower min
+                        min = currentScore;//setting beta value
+                        bestNode = possibleMoves;
+                        bestMove = possibleMoves;
+                    }
+                    if (min <= max) //THIS 'IF' PROVIDES PRUNING FUNCTIONALITY FOR MIN NODES
+                    {//if beta < alpha
+                        //Console.WriteLine(min + "<=" +max+", Pruning the rest of this branch and backtracking...");
+                        return min; //return beta (cut off rest of search for this branch)
+                    }
+                }
+            }
+            //has exausted all moves for a node
+            return isMax ? max : min;
+        }
+        public void Somewhat()
+        {
+
+        }
+        public int Very(int depth, bool isMax, int min, int max, int[] node, ref int[] bestMove)
+        {
+            totalMoves++;
+            Console.WriteLine("\nDepth: " + depth);
+            String s1 = isMax ? "max, currently: " + max : "min, currently " + min;
+            Console.WriteLine("current Player = " + s1);
+            if (depth == 0)//if at leaf node (root = maxDepth)
+            {
+                int j = Evaluation(node);
+                Console.WriteLine("Node score: " + j);
+                PrintNode(node);
+                return j;
+            }
+
+            PrintNode(node);
+            int[] bestNode = new int[81];
+            foreach (int[] possibleMoves in GetChildren(node, depth))
+            {//calculates and receives one move at a time for every possible move in 'node'
+                int currentScore = Dumb(depth - 1, !isMax, min, max, TranslateNode(possibleMoves, node), ref bestMove);
+                //recursive call of Dumb() will travel from current node to each child node until all moves are evaluated
+                //this is where all backtracking occurs
+
+                if (depth == 4)
+                {
+                    int k = 5;
+                }
+
+                if (isMax) //MaxPlayer
+                {
+                    if (currentScore > max)
+                    {//we have found a better max
+                        max = currentScore;  //setting aplha value
+                        //Console.WriteLine("depth = " + depth +" new max = "+ max);
+                        bestNode = possibleMoves;
+                        bestMove = possibleMoves;
+                    }
+                    if (max >= min) //THIS 'IF' PROVIDES PRUNING FUNCTIONALITY FOR MAX NODES
+                    {//if alpha > beta
+                        Console.WriteLine(max + ">=" + min + "Pruning the rest of this branch and backtracking...");
                         return max; //return alpha (cut off rest of search for this branch)
                     }
                 }
@@ -139,7 +234,7 @@ namespace PegSolitair
                     }
                     if (min <= max) //THIS 'IF' PROVIDES PRUNING FUNCTIONALITY FOR MIN NODES
                     {//if beta < alpha
-                        Console.WriteLine(min + "<=" +max+", Pruning the rest of this branch and backtracking...");
+                        Console.WriteLine(min + "<=" + max + ", Pruning the rest of this branch and backtracking...");
                         return min; //return beta (cut off rest of search for this branch)
                     }
                 }
@@ -147,21 +242,13 @@ namespace PegSolitair
             //has exausted all moves for a node
             return isMax ? max : min;
         }
-        public void Somewhat()
-        {
-
-        }
-        public void Very()
-        {
-
-        }
         private IEnumerable<int[]> GetChildren(int[] node, int depth)
         {
             //computes and returns a single possible move
             //into an enumarable array of ints(a node).
             //each yield return adds one move to 
 
-            //this is where the logic for only picking 16 pieces to update WOULD come in
+            //this is where the logic for only looking at 16 pieces to update WOULD come in
             for (int y = 0; y < 9; y++)
             {
                 for (int x = 0; x < 9; x++)
@@ -269,7 +356,7 @@ namespace PegSolitair
             // high value = more weighted 
             //smart evaluation looks for win/loss states, 
             //if none are found it looks for sweeps
-            //if none are found it weighs the node by number of moves
+            //if none are found it weighs the node by number of moves where more move is more desirable
             //  -since we aimed to develop a very very efficient AI, 
             //      we will be hoping that is our edge over the competition
             //      , so we will give nodes with more complexity(more moves) a higher precedence,
@@ -293,11 +380,12 @@ namespace PegSolitair
                 if (checkForSweep(node))//does this node lead to an unavoidable string of one moves til endgame?
                     return 1000;
             }
-            return 1;
+            return moveCount; //more moves at root = more desirable for our search, given that (hopefully) our main advantage is speed.
         }
 
         private Boolean checkForSweep(int[] node)
         {//this method will go beyond depth bounds to search for a possible endgame sweep 
+            Console.WriteLine("Extending Search beyond maxDepth for possible sweep...");
             int moveCount = 0;
             int[] move = { 0, 0, 0 };
             foreach (int[] validMove in GetChildren(node, 0)) //0 parameter is arbitrary
@@ -317,6 +405,15 @@ namespace PegSolitair
                 checkForSweep(node);
             }
             return false;//program should never reach here 
+        }
+        private int getMoveCount(int[] node)
+        {
+            int moveCount = 0;
+            foreach (int[] validMove in GetChildren(node, 0)) //0 parameter is arbitrary
+            {
+                moveCount++;
+            }
+            return moveCount;
         }
     }
 }
