@@ -153,11 +153,13 @@ namespace PegSolitair
                         bestNode = possibleMoves;
                         bestMove = possibleMoves;
                     }
+/* THIS IS DUMB SEARCH, NO AB PRUNES ALLOWED
                     if (max >= min) //THIS 'IF' PROVIDES PRUNING FUNCTIONALITY FOR MAX NODES
                     {//if alpha > beta
                         //Console.WriteLine(max+ ">="+ min +"Pruning the rest of this branch...");
                         return max; //return alpha (cut off rest of search for this branch)
                     }
+*/
                 }
                 if (!isMax) //MinPlayer
                 {
@@ -167,11 +169,13 @@ namespace PegSolitair
                         bestNode = possibleMoves;
                         bestMove = possibleMoves;
                     }
+/* THIS IS DUMB SEARCH, NO AB PRUNES ALLOWED
                     if (min <= max) //THIS 'IF' PROVIDES PRUNING FUNCTIONALITY FOR MIN NODES
                     {//if beta < alpha
                         //Console.WriteLine(min + "<=" +max+", Pruning the rest of this branch and backtracking...");
                         return min; //return beta (cut off rest of search for this branch)
                     }
+*/
                 }
             }
             //has exausted all moves for a node
@@ -375,11 +379,17 @@ namespace PegSolitair
             }
             if (moveCount == 0)
                 return 1000; //endstate
-            if (moveCount == 1)
-            {
-                if (checkForSweep(node))//does this node lead to an unavoidable string of one moves til endgame?
-                    return 1000;
+            if (moveCount <= 2)
+            {//does this node lead to an unavoidable string of one/two move gameboards until endgame?
+                int sweepCheck = checkForSweepSmarter(node,0);
+                if (sweepCheck == 1)
+                    return 1000; //leads to an unavoidable win for the player who calls evaluation
+                else if (sweepCheck == 0)
+                    return moveCount; //(=1)
+                else
+                    return 0;//leads to an unavoidable loss for player who calls evaluation
             }
+            //other heuristics have been inconclusive if it has got this far... so let's just attempt to confuse everything...
             return moveCount; //more moves at root = more desirable for our search, given that (hopefully) our main advantage is speed.
         }
 
@@ -392,7 +402,7 @@ namespace PegSolitair
             {
                 move = validMove;
                 moveCount++;
-                if (moveCount > 1)
+                if (moveCount > 2)
                     return false;//the sweep devolves into a more complex branching pattern
             }
             if (moveCount == 0)
@@ -406,6 +416,56 @@ namespace PegSolitair
             }
             return false;//program should never reach here 
         }
+
+        private int checkForSweepSmarter(int[] node, int depth)
+        {//this method will go beyond depth bounds to search for a possible endgame sweep 
+         //returns 0 for an inconclusive sweep | -1 for losing sweep | +1 for winning sweep
+            if (depth == 0)
+            {
+                Console.WriteLine("Extending Search beyond maxDepth for possible sweep...");
+            }
+            int[] move = { 0, 0, 0 };
+            int moveCount = 0;
+            foreach (int[] validMove in GetChildren(node, 0)) //0 parameter is arbitrary
+            {
+                move = validMove;//if moveCount == 2, an overwrite here is not a problem as it's rehandled later below
+                moveCount++;
+                if (moveCount > 2)
+                    return 0;//the sweep devolves into a more complex branching patterns (no conclusive results)
+            }
+            if (moveCount == 0)
+            {//this examined sweep continues until endgame
+                Console.WriteLine("Sweep checking found endgame!");
+                if (depth % 2 == 0)
+                    return -1; //if endstate found here it is a loss. return bad eval #(-1) this branch could defeat us
+                else
+                    return 1; //this endstate on the other hand could be our deep win return good eval (1)
+            }
+            if (moveCount == 1)
+            {
+                TranslateNode(move, node);
+                checkForSweepSmarter(node,depth+1);
+            }
+            if (moveCount == 2)
+            {
+                foreach (int[] validMove in GetChildren(node, 0)) //0 parameter is arbitrary
+                {
+                    move = validMove;
+                    TranslateNode(move, node);
+                    int branchSweepVar = checkForSweepSmarter(node, depth + 1);
+                    if (branchSweepVar == -1)
+                        return -1;
+                    if (branchSweepVar == 0)
+                        return 0;
+                    //shortcoming... if first branch evaluates to 0 and next to -1 we will never know of the -1 and wont forsee that possible loss until minimax picks it up
+                    //so if it has not returned after both moves are evaluated (at this point), then both branches end with win states!
+                }
+                return 1;
+            }
+            return 0;//program execution should never reach here 
+        }
+
+
         private int getMoveCount(int[] node)
         {
             int moveCount = 0;
